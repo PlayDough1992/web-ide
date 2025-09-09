@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PD-WebDev - Monaco Editor</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #232526 0%, #414345 100%);
+      color: #f3f3f3;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #ide-root {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+      border-radius: 18px;
+      margin: 18px;
+      background: rgba(34, 40, 49, 0.85);
+      backdrop-filter: blur(8px);
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+    }
+    #file-explorer {
+      width: 270px;
+      background: rgba(34, 40, 49, 0.95);
+      color: #f3f3f3;
+      padding: 1.2em 0.8em 1.2em 1.2em;
+      overflow-y: auto;
+      border-right: 1.5px solid #232526;
+      box-shadow: 2px 0 12px 0 rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      min-width: 220px;
+    }
+    #file-explorer h2 {
+      font-size: 1.2em;
+      margin: 0 0 1em 0;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+      color: #7ee787;
+      text-shadow: 0 2px 8px #23252644;
+    }
+    #explorer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5em;
+    }
+    #explorer-actions {
+      display: flex;
+      gap: 0.5em;
+      margin-bottom: 1.2em;
+      flex-wrap: wrap;
+    }
+    #explorer-actions button {
+      font-size: 0.98em;
+      background: #232526;
+      color: #7ee787;
+      border: none;
+      border-radius: 6px;
+      padding: 0.4em 0.9em;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      font-weight: 500;
+    }
+    #explorer-actions button:hover {
+      background: #7ee787;
+      color: #232526;
+    }
+    #file-tree {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+      font-size: 1.04em;
+    }
+    .file, .folder {
+      cursor: pointer;
+      border-radius: 6px;
+      margin-bottom: 2px;
+      transition: background 0.18s, color 0.18s;
+      user-select: none;
+      position: relative;
+    }
+    .file:before {
+      content: '\1F4C4';
+      position: relative;
+      padding-right: 3px;
+      font-size: 1em;
+      opacity: 0.7;
+    }
+    .folder:before {
+      content: '\1F4C1';
+      position: relative;
+      left: 0;
+      top: 0;
+      font-size: 1em;
+      opacity: 0.7;
+    }
+    .folder {
+      font-weight: 600;
+      color: #7ee787;
+    }
+
+    .file {
+      font-weight: 600;
+      color: #5654f0;
+    }
+
+
+    .selected {
+      background: linear-gradient(90deg, #7ee78733 0%, #232526 100%);
+      color: #232526;
+      font-weight: 700;
+    }
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: rgba(34, 40, 49, 0.92);
+      border-radius: 0 18px 18px 0;
+      overflow: hidden;
+    }
+    #tabs {
+      color: white;
+      display: flex;
+      background: rgba(30, 34, 40, 0.98);
+      border-bottom: 1.5px solid #232526;
+      min-height: 44px;
+      align-items: flex-end;
+      padding-left: 0.5em;
+    }
+    .tab {
+      padding: 0.7em 1.4em 0.6em 1.1em;
+      cursor: pointer;
+      background: rgba(74, 74, 175, 0.438);
+      color: #9b9b9bdc;
+      border: none;
+      border-radius: 10px 10px 0 0;
+      margin-right: 0.2em;
+      font-size: 1.04em;
+      position: relative;
+      transition: background 0.18s, color 0.18s;
+      font-weight: 500;
+    }
+    .tab.active {
+      background: rgba(94, 94, 240, 0.63);
+      color: #ffffff;
+      font-weight: 700;
+      box-shadow: 0 -2px 8px 0 #7ee78722;
+    }
+    .tab .close {
+      margin-left: 0.7em;
+      color: #aaaaaa;
+      background: transparent;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      font-size: 1.2em;
+      transition: color 0.18s;
+    }
+    .tab .close:hover {
+      height: 24px;
+      width: 24px;
+      color: #b71c1c;
+      background: rgba(99, 0, 0, 0);
+      border-radius: 3px;
+    }
+    #editor-container {
+      flex: 1;
+      min-height: 300px;
+      position: relative;
+      background: rgba(34, 40, 49, 0.98);
+      border-radius: 0 0 18px 0;
+      box-shadow: 0 2px 16px 0 #23252622;
+      overflow: hidden;
+      display: block;
+    }
+    #run-btn {
+      background: linear-gradient(135deg, #7ee787 0%, #27ae60 100%);
+      color: #232526;
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      font-size: 1.3em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 12px 0 #7ee78744;
+      transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+      margin-left: 0.5em;
+    }
+    #run-btn:hover {
+      background: linear-gradient(135deg, #27ae60 0%, #7ee787 100%);
+      color: #fff;
+      box-shadow: 0 4px 24px 0 #27ae6044;
+    }
+    #modal-bg {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(34, 40, 49, 0.55);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.2s;
+    }
+    #modal, #move-modal {
+      background: rgba(34,40,49,0.98);
+      color: #f3f3f3;
+      padding: 2.2em 2.5em 2em 2.5em;
+      border-radius: 16px;
+      min-width: 320px;
+      box-shadow: 0 8px 32px 0 #23252633;
+      animation: popIn 0.22s;
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+    }
+    #move-modal {
+      min-width: 650px;
+      min-height: 350px;
+      display: flex;
+      gap: 2.5em;
+      position: relative;
+      background: rgb(34, 40, 49);
+      border-radius: 20px;
+      box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.22), 0 1.5px 8px 0 rgba(127,255,166,0.08);
+      border: 1.5px solid rgb(3, 133, 42);
+      backdrop-filter: blur(2.5px);
+      flex-wrap: wrap;
+    }
+    #move-modal h3 {
+      color: #7ee787;
+      background: rgba(128, 128, 128, 0);
+      margin-top: 0;
+      font-size: 1.18em;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.7em;
+      text-align: center;
+      text-shadow: 0 1px 8px rgba(127,255,166,0.10);
+    }
+    #move-modal ul {
+      background: rgba(30,34,40,0.90);
+      border-radius: 12px;
+      padding: 0.7em 0.7em 0.7em 0.7em;
+      min-height: 200px;
+      max-height: 300px;
+      overflow-y: auto;
+      box-shadow: 0 2px 8px 0 rgba(31, 38, 135, 0.10);
+      border: 1.5px solid rgba(127,255,166,0.10);
+    }
+    #move-modal li {
+      padding: 7px 0 7px 20px;
+      border-radius: 7px;
+      margin-bottom: 3px;
+      transition: background 0.18s, color 0.18s;
+      user-select: none;
+      position: relative;
+      cursor: pointer;
+      font-size: 1.04em;
+    }
+    #move-modal li.move-selected {
+      background: linear-gradient(90deg, #7ee78755 0%, #232526 100%);
+      color: #232526;
+      font-weight: 700;
+      box-shadow: 0 0 0 2px #7ee78744;
+    }
+    #move-modal li:hover {
+      background: rgba(127,255,166,0.13);
+      color: #7ee787;
+    }
+    /* Move Modal Responsive */
+    @media (max-width: 900px) {
+      #move-modal {
+        min-width: 90vw;
+        padding: 1.2em 2vw 1.2em 2vw;
+        flex-direction: column;
+        gap: 1.2em;
+      }
+      #move-modal > div {
+        min-width: unset !important;
+        width: 100% !important;
+      }
+    }
+    #modal label {
+      display: block;
+      margin-bottom: 0.7em;
+      font-weight: 600;
+      color: #27ae60;
+      font-size: 1.08em;
+    }
+    #modal input {
+      width: 100%;
+      margin-bottom: 1.2em;
+      padding: 0.5em 0.7em;
+      border-radius: 6px;
+      border: 1.5px solid #7ee787;
+      font-size: 1.05em;
+      background: #f3f3f3;
+      color: #232526;
+      outline: none;
+      transition: border 0.18s;
+    }
+    #modal input:focus {
+      border: 1.5px solid #27ae60;
+    }
+    #modal-actions {
+      display: flex;
+      gap: 1em;
+      justify-content: flex-end;
+    }
+    #modal-actions button {
+      font-size: 1em;
+      background: #7ee787;
+      color: #232526;
+      border: none;
+      border-radius: 6px;
+      padding: 0.4em 1.2em;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.18s, color 0.18s;
+    }
+    #modal-actions button[type="button"], #move-modal button[type="button"] {
+      background: #e57373;
+      color: #fff;
+    }
+    #modal-actions button[type="button"]:hover, #move-modal button[type="button"]:hover {
+      background: #b71c1c;
+    }
+    #modal-actions button[type="submit"]:hover, #move-modal button:hover {
+      background: #27ae60;
+      color: #fff;
+    }
+    #webview-tab {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #fff;
+      border-radius: 0 0 18px 0;
+      box-shadow: 0 2px 16px 0 #23252622;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes popIn {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .monaco-editor, .monaco-editor-background {
+      border-radius: 0 0 18px 0 !important;
+      background: #232526 !important;
+    }
+    .monaco-editor .margin, .monaco-editor .monaco-editor-background {
+      background: #232526 !important;
+    }
+    .monaco-editor .view-lines {
+      font-size: 1.08em !important;
+    }
+    ::-webkit-scrollbar {
+      width: 10px;
+      background: #232526;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #7ee78755;
+      border-radius: 6px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #27ae60aa;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+</head>
+<body>
+  <div id="ide-root">
+    <div id="file-explorer">
+      <div id="explorer-header">
+        <h2 style="margin: 0;">Files</h2>
+        <button id="run-btn" title="Run (Play)">&#9654;</button>
+      </div>
+      <div id="explorer-actions">
+        <button onclick="showModal('file')">+ File</button>
+        <button onclick="showModal('folder')">+ Folder</button>
+        <button onclick="deleteSelected()">Delete</button>
+        <button onclick="downloadSelected()">Download</button>
+        <button onclick="showMoveModal()">Move</button>
+      </div>
+      <ul id="file-tree"></ul>
+    </div>
+    <div id="main">
+      <div id="tabs"></div>
+      <div id="editor-container">
+        <div id="editor" style="width:100%;height:100%;"></div>
+      </div>
+    </div>
+  </div>
+  <div id="modal-bg">
+    <div id="modal">
+      <form id="modal-form" onsubmit="return false;">
+        <label id="modal-label"></label>
+        <input id="modal-input" required />
+        <div id="modal-actions">
+          <button type="submit">OK</button>
+          <button type="button" onclick="closeModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div id="move-modal-bg" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(34,40,49,0.55);z-index:9999;align-items:center;justify-content:center;">
+    <div id="move-modal" style="background:#464646;color:#50cf50;padding:2em 2.5em;border-radius:16px;min-width:600px;min-height:350px;box-shadow:0 8px 32px 0 #23252633;display:flex;gap:2em;">
+      <div style="flex:1;min-width:200px;">
+        <h3>Current Structure</h3>
+        <ul id="move-current-tree" style="list-style:none;padding:0;"></ul>
+      </div>
+      <div style="flex:1;min-width:200px;">
+        <h3>Move To</h3>
+        <ul id="move-dest-tree" style="list-style:none;padding:0;"></ul>
+      </div>
+      <div style="position:absolute;bottom:2em;right:2.5em;display:flex;gap:1em;">
+        <button id="move-confirm-btn" style="background: green; border-radius: 8px; color: white; border: solid 0px;">Move</button>
+        <button onclick="closeMoveModal()" style="border-radius: 8px; background: red; color: white; border: solid 0px;">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    // --- In-memory file system ---
+    const root = { name: '', type: 'folder', children: [] };
+    let selectedNode = null;
+    let openTabs = [];
+    let activeTab = null;
+    let monacoEditor = null;
+    let webviewTab = null;
+    const monacoModels = {};
+    // --- File System Helpers ---
+    if (typeof JSZip === 'undefined') {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+      document.body.appendChild(script);
+    }
+    function findNodeByPath(path, node = root) {
+      if (!path || path === '/') return root;
+      const parts = path.split('/').filter(Boolean);
+      let curr = node;
+      for (const part of parts) {
+        if (!curr.children) return null;
+        curr = curr.children.find(c => c.name === part);
+        if (!curr) return null;
+      }
+      return curr;
+    }
+    function getParentNode(path) {
+      const parts = path.split('/').filter(Boolean);
+      if (parts.length === 0) return null;
+      parts.pop();
+      return findNodeByPath(parts.join('/'));
+    }
+    function addNode(parentPath, name, type) {
+      const parent = findNodeByPath(parentPath);
+      if (!parent || parent.type !== 'folder') return;
+      if (parent.children.some(c => c.name === name)) return;
+      const node = { name, type };
+      if (type === 'folder') node.children = [];
+      else node.content = '';
+      parent.children.push(node);
+      renderFileTree();
+    }
+    function deleteNode(path) {
+      if (!path) return;
+      const parent = getParentNode(path);
+      if (!parent) return;
+      const name = path.split('/').filter(Boolean).pop();
+      parent.children = parent.children.filter(c => c.name !== name);
+      renderFileTree();
+      // Close tab if open
+      openTabs = openTabs.filter(tab => tab.path !== path);
+      if (activeTab && activeTab.path === path) {
+        activeTab = openTabs.length ? openTabs[0] : null;
+        renderTabs();
+      }
+    }
+    function getAllPaths(node = root, prefix = '') {
+      let paths = [];
+      if (node !== root) paths.push(prefix);
+      if (node.type === 'folder') {
+        for (const child of node.children) {
+          paths = paths.concat(getAllPaths(child, prefix + '/' + child.name));
+        }
+      }
+      return paths;
+    }
+    // --- File Tree UI ---
+    function renderFileTree() {
+      const ul = document.getElementById('file-tree');
+      ul.innerHTML = '';
+      function renderNode(node, path, depth) {
+        const li = document.createElement('li');
+        li.style.paddingLeft = (depth * 16) + 'px';
+        li.className = node.type + (selectedNode && selectedNode.path === path ? ' selected' : '');
+        li.textContent = node.name || '/';
+        li.onclick = e => {
+          e.stopPropagation();
+          selectedNode = { ...node, path };
+          if (node.type === 'file') openFile(path);
+          renderFileTree();
+        };
+        ul.appendChild(li);
+        if (node.type === 'folder') {
+          for (const child of node.children) {
+            renderNode(child, path + '/' + child.name, depth + 1);
+          }
+        }
+      }
+      renderNode(root, '', 0);
+    }
+    // --- Tabs ---
+    function getLanguageFromFilename(filename) {
+      if (filename.endsWith('.js')) return 'javascript';
+      if (filename.endsWith('.ts')) return 'typescript';
+      if (filename.endsWith('.css')) return 'css';
+      if (filename.endsWith('.html')) return 'html';
+      if (filename.endsWith('.json')) return 'json';
+      if (filename.endsWith('.md')) return 'markdown';
+      if (filename.endsWith('.py')) return 'python';
+      return 'plaintext';
+    }
+    function renderTabs() {
+      const tabsDiv = document.getElementById('tabs');
+      tabsDiv.innerHTML = '';
+      openTabs.forEach(tab => {
+        const tabBtn = document.createElement('button');
+        tabBtn.className = 'tab' + (activeTab && activeTab.path === tab.path ? ' active' : '');
+        tabBtn.textContent = tab.name;
+        tabBtn.onclick = () => setActiveTab(tab.path);
+        if (tab.path !== 'webview') {
+          const closeBtn = document.createElement('span');
+          closeBtn.className = 'close';
+          closeBtn.textContent = '×';
+          closeBtn.onclick = e => { e.stopPropagation(); closeTab(tab.path); };
+          tabBtn.appendChild(closeBtn);
+        }
+        tabsDiv.appendChild(tabBtn);
+      });
+      renderEditor();
+    }
+    function openFile(path) {
+      const node = findNodeByPath(path);
+      if (!node || node.type !== 'file') return;
+      if (!openTabs.some(tab => tab.path === path)) {
+        openTabs.push({ path, name: node.name });
+      }
+      setActiveTab(path);
+    }
+    function setActiveTab(path) {
+      activeTab = openTabs.find(tab => tab.path === path);
+      renderTabs();
+    }
+    function closeTab(path) {
+      openTabs = openTabs.filter(tab => tab.path !== path);
+      if (activeTab && activeTab.path === path) {
+        activeTab = openTabs.length ? openTabs[0] : null;
+      }
+      renderTabs();
+    }
+    // --- Editor ---
+    function renderEditor() {
+      const container = document.getElementById('editor-container');
+      const editorDiv = document.getElementById('editor');
+      if (activeTab && activeTab.path === 'webview') {
+        editorDiv.style.display = 'none';
+        if (!webviewTab) {
+          webviewTab = document.createElement('iframe');
+          webviewTab.id = 'webview-tab';
+          container.appendChild(webviewTab);
+        }
+        webviewTab.style.display = 'block';
+      } else {
+        if (webviewTab) webviewTab.style.display = 'none';
+        editorDiv.style.display = 'block';
+        if (monacoEditor && activeTab && activeTab.path) {
+          const node = findNodeByPath(activeTab.path);
+          if (node) {
+            if (!monacoModels[activeTab.path]) {
+              monacoModels[activeTab.path] = monaco.editor.createModel(
+                node.content,
+                getLanguageFromFilename(node.name)
+              );
+            }
+            monacoEditor.setModel(monacoModels[activeTab.path]);
+            monacoEditor.updateOptions({ readOnly: false });
+          }
+        } else if (monacoEditor) {
+          monacoEditor.setModel(null);
+          monacoEditor.updateOptions({ readOnly: true });
+        }
+      }
+    }
+    function showModal(type) {
+      document.getElementById('modal-bg').style.display = 'flex';
+      const label = document.getElementById('modal-label');
+      label.textContent = type === 'file' ? 'File name (with extension):' : 'Folder name:';
+      document.getElementById('modal-input').value = '';
+      document.getElementById('modal-form').onsubmit = function() {
+        const name = document.getElementById('modal-input').value.trim();
+        if (!name) return false;
+        let parentPath = '';
+        if (selectedNode && selectedNode.type === 'folder') parentPath = selectedNode.path;
+        else if (selectedNode && selectedNode.path) parentPath = getParentNode(selectedNode.path)?.path || '';
+        addNode(parentPath, name, type);
+        closeModal();
+        if (type === 'file') {
+          const fullPath = (parentPath ? parentPath : '') + '/' + name;
+          openFile(fullPath.replace(/\/+/g, '/'));
+        }
+        renderFileTree();
+        return false;
+      };
+    }
+    function closeModal() {
+      document.getElementById('modal-bg').style.display = 'none';
+    }
+    function showMoveModal() {
+      if (!selectedNode || selectedNode === root) return;
+      document.getElementById('move-modal-bg').style.display = 'flex';
+      renderMoveTree('move-current-tree', root, '', selectedNode.path, true);
+      renderMoveTree('move-dest-tree', root, '', null, false);
+      window.moveDestPath = null;
+    }
+    function closeMoveModal() {
+      document.getElementById('move-modal-bg').style.display = 'none';
+    }
+    function renderMoveTree(ulId, node, path, highlightPath, isCurrent) {
+      const ul = document.getElementById(ulId);
+      if (!ul) return;
+      if (path === undefined) path = '';
+      if (ulId === 'move-dest-tree') ul.innerHTML = '';
+      function renderNode(n, p, depth) {
+        const li = document.createElement('li');
+        li.style.paddingLeft = (depth * 16) + 'px';
+        li.textContent = n.name || '/';
+        if (isCurrent && p === highlightPath) li.style.fontWeight = 'bold';
+        if (!isCurrent && n.type === 'folder') {
+          li.style.cursor = 'pointer';
+          li.onclick = function() {
+            const prev = ul.querySelector('.move-selected');
+            if (prev) prev.classList.remove('move-selected');
+            li.classList.add('move-selected');
+            window.moveDestPath = p;
+          };
+        }
+        ul.appendChild(li);
+        if (n.type === 'folder') {
+          for (const child of n.children) {
+            renderNode(child, p + '/' + child.name, depth + 1);
+          }
+        }
+      }
+      if (isCurrent) ul.innerHTML = '';
+      renderNode(node, path, 0);
+    }
+    document.getElementById('move-confirm-btn').onclick = function() {
+      if (!window.moveDestPath || !selectedNode || selectedNode.path === window.moveDestPath) return closeMoveModal();
+      moveNode(selectedNode.path, window.moveDestPath);
+      closeMoveModal();
+      renderFileTree();
+    };
+    function moveNode(srcPath, destPath) {
+      if (!srcPath || !destPath) return;
+      const node = findNodeByPath(srcPath);
+      const dest = findNodeByPath(destPath);
+      if (!node || !dest || dest.type !== 'folder') return;
+      // Remove from old parent
+      const parent = getParentNode(srcPath);
+      if (!parent) return;
+      parent.children = parent.children.filter(c => c.name !== node.name);
+      // Add to new parent
+      dest.children.push(node);
+      // Update openTabs paths if needed
+      openTabs = openTabs.map(tab => tab.path === srcPath ? { ...tab, path: destPath + '/' + node.name } : tab);
+      if (selectedNode && selectedNode.path === srcPath) selectedNode.path = destPath + '/' + node.name;
+    }
+    // --- Delete ---
+    function deleteSelected() {
+      if (!selectedNode || selectedNode === root) return;
+      deleteNode(selectedNode.path);
+      selectedNode = null;
+      renderFileTree();
+    }
+    function downloadSelected() {
+      if (!selectedNode) return;
+      if (selectedNode.type === 'file') {
+        downloadFile(selectedNode.path);
+      } else if (selectedNode.type === 'folder') {
+        downloadFolder(selectedNode.path);
+      }
+    }
+    // --- Download ---
+    function downloadFile(path) {
+      const node = findNodeByPath(path);
+      if (!node || node.type !== 'file') return;
+      const blob = new Blob([node.content], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = node.name;
+      a.click();
+    }
+    function downloadFolder(path) {
+      function doZip() {
+        const zip = new JSZip();
+        const node = findNodeByPath(path);
+        if (!node || node.type !== 'folder') return;
+    
+        // Corrected: always pass the new folder as the parent in recursion
+        function addToZip(n, zipFolder) {
+          if (n.type === 'file') {
+            zipFolder.file(n.name, n.content || '');
+          } else if (n.type === 'folder') {
+            const folder = zipFolder.folder(n.name);
+            for (const child of n.children) {
+              addToZip(child, folder);
+            }
+          }
+        }
+    
+        // If root, put everything in a 'project' folder
+        if (path === '') {
+          const projectFolder = zip.folder('project');
+          for (const child of node.children) {
+            addToZip(child, projectFolder);
+          }
+        } else {
+          addToZip(node, zip);
+        }
+    
+        zip.generateAsync({ type: 'blob' }).then(function(content) {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(content);
+          a.download = (path === '' ? 'project' : node.name) + '.zip';
+          a.click();
+        });
+      }
+      if (typeof JSZip === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+        script.onload = doZip;
+        document.body.appendChild(script);
+        return;
+      }
+      doZip();
+    }
+    // --- Save ---
+    function saveFile(path, content) {
+      const node = findNodeByPath(path);
+      if (node && node.type === 'file') {
+        node.content = content;
+      }
+    }
+    // --- Run (Play) ---
+    function runWebFile() {
+      // Find the main HTML file (active or first .html file)
+      let htmlPath = activeTab && activeTab.path && activeTab.path.endsWith('.html') ? activeTab.path : null;
+      if (!htmlPath) {
+        const htmlFiles = getAllPaths().filter(p => p.endsWith('.html'));
+        if (htmlFiles.length) htmlPath = htmlFiles[0];
+      }
+      if (!htmlPath) {
+        alert('No HTML file to run.');
+        return;
+      }
+      // Gather all files for iframe srcdoc
+      const files = {};
+      getAllPaths().forEach(p => {
+        const n = findNodeByPath(p);
+        if (n.type === 'file') files[p.replace(/^\//, '')] = n.content;
+      });
+      const mainHtml = files[htmlPath.replace(/^\//, '')];
+      // Replace <script src=...> and <link rel="stylesheet" href=...> with in-memory content
+      let srcdoc = mainHtml.replace(/<script src="([^"]+)"><\/script>/g, (m, src) => {
+        const js = files[src];
+        return js ? `<script>${js}<\/script>` : m;
+      }).replace(/<link rel="stylesheet" href="([^"]+)"\s*\/?>(<\/link>)?/g, (m, href) => {
+        const css = files[href];
+        return css ? `<style>${css}<\/style>` : m;
+      });
+      // Open in webview tab
+      if (!openTabs.some(tab => tab.path === 'webview')) {
+        openTabs.push({ path: 'webview', name: '▶ Web' });
+      }
+      setActiveTab('webview');
+      setTimeout(() => {
+        if (webviewTab) webviewTab.srcdoc = srcdoc;
+      }, 100);
+    }
+    // --- Monaco Loader ---
+    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+    require(['vs/editor/editor.main'], function () {
+      monacoEditor = monaco.editor.create(document.getElementById('editor'), {
+        value: '',
+        language: 'javascript',
+        theme: 'vs-dark',
+        automaticLayout: true,
+        fontSize: 15,
+        readOnly: true,
+      });
+      monacoEditor.onDidChangeModelContent(() => {
+        if (activeTab && activeTab.path && activeTab.path !== 'webview') {
+          const model = monacoModels[activeTab.path];
+          if (model) saveFile(activeTab.path, model.getValue());
+        }
+      });
+      // Add a default file if none exist
+      if (getAllPaths().filter(p => {
+        const n = findNodeByPath(p);
+        return n && n.type === 'file';
+      }).length === 0) {
+        root.children.push({ name: 'index.html', type: 'file', content: '<!DOCTYPE html>\n<html>\n<head>\n  <title>Welcome</title>\n</head>\n<body>\n  <h1>Welcome to your Web IDE!</h1>\n</body>\n</html>' });
+      }
+      renderFileTree();
+      // Open first file if any
+      const allFiles = getAllPaths().filter(p => {
+        const n = findNodeByPath(p);
+        return n && n.type === 'file';
+      });
+      if (allFiles.length) {
+        openFile(allFiles[0]);
+      }
+      renderTabs();
+    });
+    document.getElementById('run-btn').onclick = runWebFile;
+    window.onresize = () => monacoEditor && monacoEditor.layout();
+  </script>
+</body>
+</html>
