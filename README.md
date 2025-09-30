@@ -56,6 +56,11 @@ Enjoy fast, distraction-free web development—right in your browser!
 
 ## Create these directories and files in PD-WebDev and click run!
 
+## The game should look like this:
+
+<img width="873" height="662" alt="image" src="https://github.com/user-attachments/assets/0f77b1da-2cfe-4cf2-8e9f-c18ec664751d" />
+
+
 ## HTML/index.html
 ```html
 <!DOCTYPE html>
