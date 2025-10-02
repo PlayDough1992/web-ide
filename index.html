@@ -1,3 +1,36 @@
+  <div id="gist-export-modal-bg" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(34,40,49,0.55);z-index:9999;align-items:center;justify-content:center;">
+    <div id="modal" style="min-width:340px;">
+      <form id="gist-export-form" onsubmit="return false;">
+        <label for="gist-export-token" style="color:#7ee787;font-weight:600;">GitHub Token (create at <a href='https://github.com/settings/tokens' target='_blank' style='color:#27ae60;'>github.com/settings/tokens</a>):</label>
+        <input id="gist-export-token" required placeholder="ghp_xxx..." style="margin-bottom:1.2em;" />
+        <label for="gist-export-desc" style="color:#7ee787;font-weight:600;">Description (optional):</label>
+        <input id="gist-export-desc" placeholder="Description for your Gist" style="margin-bottom:1.2em;" />
+        <label style="color:#7ee787;font-weight:600;">Visibility:</label>
+        <div style="margin-bottom:1.2em;">
+          <label><input type="radio" name="gist-export-public" value="true" checked /> Public</label>
+          <label style="margin-left:1.5em;"><input type="radio" name="gist-export-public" value="false" /> Secret</label>
+        </div>
+        <div id="modal-actions">
+          <button type="submit">Export</button>
+          <button type="button" onclick="closeGistExportModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- Gist export modal JS moved to main <script> block below -->
+  <div id="gist-import-modal-bg" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(34,40,49,0.55);z-index:9999;align-items:center;justify-content:center;">
+    <div id="modal" style="min-width:340px;">
+      <form id="gist-import-form" onsubmit="return false;">
+        <label for="gist-import-input" style="color:#7ee787;font-weight:600;">GitHub Gist URL or ID:</label>
+        <input id="gist-import-input" required placeholder="e.g. https://gist.github.com/username/abcdef123456 or abcdef123456" style="margin-bottom:1.2em;" />
+        <div id="modal-actions">
+          <button type="submit">Import</button>
+          <button type="button" onclick="closeGistImportModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- Gist import modal JS moved to main <script> block below -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -397,11 +430,13 @@
         <button id="run-btn" title="Run (Play)">&#9654;</button>
       </div>
       <div id="explorer-actions">
-        <button onclick="showModal('file')">+ File</button>
-        <button onclick="showModal('folder')">+ Folder</button>
-        <button onclick="deleteSelected()">Delete</button>
-        <button onclick="downloadSelected()">Download</button>
-        <button onclick="showMoveModal()">Move</button>
+  <button onclick="showModal('file')">+ File</button>
+  <button onclick="showModal('folder')">+ Folder</button>
+  <button onclick="deleteSelected()">Delete</button>
+  <button onclick="downloadSelected()">Download</button>
+  <button onclick="showMoveModal()">Move</button>
+  <button onclick="showGistImportModal()" title="Import from GitHub Gist">⇩ Gist</button>
+  <button onclick="showGistExportModal()" title="Export as GitHub Gist">⇧ Gist</button>
       </div>
       <ul id="file-tree"></ul>
     </div>
@@ -441,6 +476,109 @@
     </div>
   </div>
   <script>
+    // --- Gist Export Modal Logic ---
+    function showGistExportModal() {
+      document.getElementById('gist-export-modal-bg').style.display = 'flex';
+      document.getElementById('gist-export-token').value = '';
+      document.getElementById('gist-export-desc').value = '';
+      document.querySelectorAll('input[name="gist-export-public"]')[0].checked = true;
+      document.getElementById('gist-export-form').onsubmit = function() {
+        const token = document.getElementById('gist-export-token').value.trim();
+        const desc = document.getElementById('gist-export-desc').value.trim();
+        const pub = document.querySelector('input[name="gist-export-public"]:checked').value === 'true';
+        if (!token) { alert('GitHub token required.'); return false; }
+        exportGist(token, desc, pub);
+        closeGistExportModal();
+        return false;
+      };
+    }
+    function closeGistExportModal() {
+      document.getElementById('gist-export-modal-bg').style.display = 'none';
+    }
+    async function exportGist(token, desc, pub) {
+      // Gather all files in the project, only non-empty, valid, unique filenames
+      const files = {};
+      const usedNames = new Set();
+      getAllPaths().forEach(p => {
+        const n = findNodeByPath(p);
+        if (n.type === 'file') {
+          let rel = p.replace(/^\//, '');
+          // Only allow valid filenames and non-empty content
+          if (rel && n.content && n.content.trim() && !usedNames.has(rel)) {
+            files[rel] = { content: n.content };
+            usedNames.add(rel);
+          }
+        }
+      });
+      if (Object.keys(files).length === 0) { alert('No files with content to export.'); return; }
+      try {
+        const resp = await fetch('https://api.github.com/gists', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'token ' + token,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ description: desc, public: pub, files })
+        });
+        const data = await resp.json();
+        if (resp.status === 201 && data.html_url) {
+          alert('Gist created!\n' + data.html_url);
+          window.open(data.html_url, '_blank');
+        } else {
+          alert('Failed to create Gist: ' + (data.message || 'Unknown error'));
+        }
+      } catch (e) {
+        alert('Error exporting Gist: ' + e.message);
+      }
+    }
+    // --- Gist Import Modal Logic ---
+    function showGistImportModal() {
+      document.getElementById('gist-import-modal-bg').style.display = 'flex';
+      document.getElementById('gist-import-input').value = '';
+      document.getElementById('gist-import-form').onsubmit = function() {
+        const val = document.getElementById('gist-import-input').value.trim();
+        if (!val) return false;
+        importGist(val);
+        closeGistImportModal();
+        return false;
+      };
+    }
+    function closeGistImportModal() {
+      document.getElementById('gist-import-modal-bg').style.display = 'none';
+    }
+    async function importGist(urlOrId) {
+      let gistId = urlOrId.trim();
+      // Extract ID from URL if needed
+      const match = gistId.match(/[0-9a-fA-F]{8,32}/);
+      if (match) gistId = match[0];
+      if (!gistId) { alert('Invalid Gist URL or ID.'); return; }
+      try {
+        const resp = await fetch(`https://api.github.com/gists/${gistId}`);
+        if (!resp.ok) throw new Error('Gist not found');
+        const data = await resp.json();
+        if (!data.files) throw new Error('No files in Gist');
+        // Place files in a new folder named gist-<id>
+        const folderName = `gist-${gistId}`;
+        addNode('', folderName, 'folder');
+        let firstFilePath = null;
+        for (const fname in data.files) {
+          const file = data.files[fname];
+          if (file && file.content !== undefined) {
+            addNode('/' + folderName, fname, 'file');
+            const node = findNodeByPath('/' + folderName + '/' + fname);
+            if (node) node.content = file.content;
+            if (!firstFilePath) firstFilePath = '/' + folderName + '/' + fname;
+          }
+        }
+        renderFileTree();
+        // Automatically open the first imported file
+        if (firstFilePath) openFile(firstFilePath);
+        alert('Gist imported!');
+      } catch (e) {
+        alert('Failed to import Gist: ' + e.message);
+      }
+    }
     // --- In-memory file system ---
     const root = { name: '', type: 'folder', children: [] };
     let selectedNode = null;
